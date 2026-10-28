@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>冥王星拯救计划：太阳系 N-Body 引力动力学与土星捕获模拟实验室</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <h1>冥王星拯救计划：太阳系 N-Body 引力动力学与土星捕获模拟实验室</h1>
+  </div>
+  <div class="header-badges">
+    <span id="orbitStateBadge" class="status-badge bound">当前状态：太阳系椭圆束缚轨道 (e = 0.244)</span>
+    <span style="color: var(--text-muted);">物理基准：<a href="https://nssdc.gsfc.nasa.gov/planetary/factsheet/plutofact.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none;">NASA 行星数据库</a></span>
+  </div>
+</header>
+
+<div class="main-container">
+  <!-- 左侧控制面板 -->
+  <aside class="sidebar">
+    <div class="card">
+      <div class="card-title">
+        <span>1. 一键实验场景预设</span>
+        <span style="font-size:10px; color:var(--text-muted);">点击切换</span>
+      </div>
+      <div class="preset-grid">
+        <button class="btn active" id="preset1" type="button">① 冥王星原始轨道</button>
+        <button class="btn" id="preset2" type="button">② 小行星撞击逃逸</button>
+        <button class="btn" id="preset3" type="button">③ 火箭拦截拉回太阳系</button>
+        <button class="btn" id="preset4" type="button">④ 过度反向推向土星飞掠</button>
+        <button class="btn" id="preset5" type="button" style="grid-column: span 2; border-color: rgba(192,132,252,0.6); color: #e9d5ff;">⑤ 推向土星 + 希尔球内逆向点火捕获成卫星</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>2. 小行星冲击与瞬时变轨脉冲</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>冲击/变轨速度增量 (Δv)</span>
+          <span class="control-val" id="dvMagVal">2.20 km/s</span>
+        </div>
+        <input type="range" id="dvMagSlider" min="0" max="15" step="0.05" value="2.20">
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>速度脉冲方向角 (相对当前速度矢量)</span>
+          <span class="control-val" id="dvAngleVal">0° (顺行加速)</span>
+        </div>
+        <input type="range" id="dvAngleSlider" min="-180" max="180" step="1" value="0">
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-danger" id="btnTriggerImpulse" type="button" style="flex:1;">💥 立即施加脉冲 Δv</button>
+        <button class="btn" id="btnCircularize" type="button" style="flex:1;">🛡️ 驻留圆化制动</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>3. 行星发动机 / 火箭推进参数</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>发动机类型与比冲 (Isp / 喷气速度 v_e)</span>
+          <span class="control-val" id="ispVal">v_e = 1000 km/s</span>
+        </div>
+        <select id="engineTypeSelect" style="width:100%; padding:6px 8px; border-radius:6px; background:#0f172a; color:#f8fafc; border:1px solid rgba(56,189,248,0.35); font-size:12px; margin-top:4px;">
+          <option value="3.73">SpaceX Raptor 3 真空化学火箭 (Isp=380s, v_e=3.73 km/s)</option>
+          <option value="4.44">氢氧化学火箭 RS-25 (Isp=453s, v_e=4.44 km/s)</option>
+          <option value="1.21">冥王星逃逸速度极限电推进 (v_e=1.21 km/s)</option>
+          <option value="100">重核裂变脉冲推进 (Isp=10,200s, v_e=100 km/s)</option>
+          <option value="1000" selected>行星级氘氦-3聚变发动机 (Isp=102,000s, v_e=1,000 km/s)</option>
+          <option value="15000">重子-反物质湮灭光子火箭 (v_e=15,000 km/s)</option>
+        </select>
+      </div>
+      <div class="control-row" style="margin-top:8px;">
+        <div class="control-label">
+          <span>持续推力模式 (开启或关闭行星发动机)</span>
+          <span class="control-val" id="contThrustVal">关闭</span>
+        </div>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <button class="btn" id="btnRetroBurn" type="button" style="flex:1;">🔥 持续逆向减速</button>
+          <button class="btn" id="btnSunBurn" type="button" style="flex:1;">🎯 持续向日推进</button>
+          <button class="btn" id="btnStopBurn" type="button">⏹ 关机</button>
+        </div>
+      </div>
+      <div class="control-row" style="margin-top:8px;">
+        <div class="control-label">
+          <span>模拟推进剂消耗占冥王星总质量比例</span>
+          <span class="control-val" id="propMassRatioVal">0.22%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>4. 土星引力与捕获辅助设置</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>土星质量倍率 (真实 = 1.0x = 5.68×10²⁶ kg)</span>
+          <span class="control-val" id="saturnMassVal">1.0x</span>
+        </div>
+        <input type="range" id="saturnMassSlider" min="0.5" max="20" step="0.5" value="1.0">
+      </div>
+      <div class="checkbox-row">
+        <label for="showHillCheck">显示土星希尔球 (Hill Sphere, 0.436 AU)</label>
+        <input type="checkbox" id="showHillCheck" checked>
+      </div>
+      <div class="checkbox-row">
+        <label for="autoCaptureCheck">进入土星希尔球时自动执行近星点逆向制动捕获</label>
+        <input type="checkbox" id="autoCaptureCheck">
+      </div>
+      <button class="btn btn-gold" id="btnManualCapture" type="button" style="width:100%; margin-top:6px;">🪐 立即锁定土星轨道（注入卫星捕获速度）</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>5. 时间流速与视图控制</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>时间步长倍率 (模拟速度)</span>
+          <span class="control-val" id="timeScaleVal">5.0 天/帧</span>
+        </div>
+        <input type="range" id="timeScaleSlider" min="0.2" max="25" step="0.2" value="5.0">
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>镜头跟随焦点</span>
+          <span class="control-val" id="cameraFocusVal">太阳系全景</span>
+        </div>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <button class="btn active" id="camSun" type="button" style="flex:1;">☀️ 太阳全景</button>
+          <button class="btn" id="camPluto" type="button" style="flex:1;">❄️ 追踪冥王星</button>
+          <button class="btn" id="camSaturn" type="button" style="flex:1;">🪐 追踪土星</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 中间 Canvas 互动区域 -->
+  <main class="canvas-wrapper">
+    <canvas id="simCanvas"></canvas>
+
+    <div class="canvas-hud">
+      <div class="hud-pill">
+        模拟历时：<strong id="simTimeYears">0.00</strong> 地球年 &nbsp;|&nbsp; 冥王星距太阳：<strong id="hudDistSun">39.48</strong> AU &nbsp;|&nbsp; 距土星：<strong id="hudDistSaturn">30.12</strong> AU
+      </div>
+      <div class="hud-pill">
+        太阳系机械能 E_sun：<strong id="hudEnergySun">-1.48e+29</strong> J &nbsp;|&nbsp; 土星相对机械能 E_sat：<strong id="hudEnergySat">+2.10e+29</strong> J
+      </div>
+      <div class="hud-pill">
+        滚轮缩放 · 按住拖拽平移 · 点击左上角预设①~⑤直观对比逃逸、火箭拉回与土星捕获
+      </div>
+    </div>
+
+    <div class="canvas-toolbar">
+      <button class="btn btn-primary" id="playPauseBtn" type="button">⏸ 暂停模拟</button>
+      <button class="btn" id="btnResetSim" type="button">🔄 重置当前场景</button>
+      <button class="btn" id="btnZoomIn" type="button">🔍 放大</button>
+      <button class="btn" id="btnZoomOut" type="button">🔎 缩小</button>
+      <button class="btn" id="btnClearTrails" type="button">🧹 清空轨迹</button>
+    </div>
+  </main>
+
+  <!-- 右侧天体物理实时遥测与深度计算面板 -->
+  <aside class="sidebar sidebar-right">
+    <div class="card">
+      <div class="card-title">
+        <span>实时轨道动力学遥测 (Telemetry)</span>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-box">
+          <div class="metric-label">冥王星日心速率 v</div>
+          <div class="metric-value" id="telVelSun">4.67 km/s</div>
+          <div class="metric-sub" id="telEscSun">太阳逃逸速度: 6.70 km/s</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">日心轨道偏心率 e</div>
+          <div class="metric-value" id="telEccSun">0.244</div>
+          <div class="metric-sub" id="telSmaSun">半长轴 a: 39.24 AU</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">冥王星相对土星速率 v_rel</div>
+          <div class="metric-value" id="telVelSat">11.20 km/s</div>
+          <div class="metric-sub" id="telEscSat">土星逃逸速度: 0.42 km/s</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">累计施加 Δv / 能量</div>
+          <div class="metric-value" id="telTotalDv">0.00 km/s</div>
+          <div class="metric-sub" id="telTotalEnergy">0.00 × 10²⁸ J</div>
+        </div>
+      </div>
+      <div class="legend-bar">
+        <div class="legend-item"><span class="dot" style="background:#fbbf24;"></span>太阳</div>
+        <div class="legend-item"><span class="dot" style="background:#f59e0b;"></span>木星 (5.2 AU)</div>
+        <div class="legend-item"><span class="dot" style="background:#eab308;"></span>土星 (9.54 AU)</div>
+        <div class="legend-item"><span class="dot" style="background:#38bdf8;"></span>天王星/海王星</div>
+        <div class="legend-item"><span class="dot" style="background:#f43f5e;"></span>冥王星实时轨迹</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>脉冲能量折算与火箭工程可行性</span>
+      </div>
+      <div class="metric-grid" style="margin-bottom:8px;">
+        <div class="metric-box">
+          <div class="metric-label">当前设定脉冲平移动能</div>
+          <div class="metric-value" id="calcKeVal">3.15 × 10²⁸ J</div>
+          <div class="metric-sub" id="calcTsarVal">≈ 1.30 亿颗沙皇氢弹</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">所需 SpaceX 猛禽3 数量</div>
+          <div class="metric-value" id="calcRaptorVal">3.37 × 10⁹ 台</div>
+          <div class="metric-sub">连续满推力燃烧 100 年</div>
+        </div>
+      </div>
+      <div class="alert-banner" id="engineeringAlert">
+        <strong>齐奥尔科夫斯基火箭方程警告：</strong> 若使用化学火箭（Isp=380s, 喷气速度 3.73 km/s）产生 2.20 km/s 的 Δv，需要消耗冥王星 <strong>46.4%</strong> 的自身质量作为燃料；若改为核聚变行星发动机（v_e=1000 km/s），仅需消耗 <strong>0.22%</strong> 冥王星质量！
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>核心天体力学问答解析</span>
+      </div>
+      <div class="formula-note" style="display:flex; flex-direction:column; gap:8px;">
+        <div>
+          <strong style="color:#f87171;">Q1: 冥王星需要多少能量才会逃离太阳系？</strong><br>
+          冥王星质量 <code>M_p = 1.303×10²² kg</code>，平均轨道半径 <code>39.24 AU</code>（平均公转速度 <code>4.64 km/s</code>，当地太阳逃逸速度 <code>6.715 km/s</code>）。顺行撞击只需补足 <code>Δv ≈ 1.97 km/s</code>（近日点仅需 <code>1.63 km/s</code>），净增机械能 <strong><code>1.47×10²⁹ J</code></strong>（相当于全球年总能耗的 2.37 亿倍）即可挣脱太阳引力束缚。
+        </div>
+        <div>
+          <strong style="color:#38bdf8;">Q2: 用火箭推进器反方向推进能带回吗？</strong><br>
+          若刚过逃逸临界点，只需逆向施加 <code>Δv ≈ 1.8~2.2 km/s</code> 即可重新被太阳捕获。但<strong>普通化学火箭不可行</strong>：一是冥王星表面逃逸速度为 <code>1.21 km/s</code>，喷气速度必须大于 <code>1.21 km/s</code> 尾气才不会落回表面；二是化学比冲太低，会烧掉近半颗冥王星。必须使用<strong>重核聚变行星发动机</strong>（<code>v_e ≥ 100~1,000 km/s</code>）。
+        </div>
+        <div>
+          <strong style="color:#c084fc;">Q3: 推回能量过大，会让冥王星变成土星的卫星吗？</strong><br>
+          <strong>单纯“推力过大”反而会让它更难被土星捕获！</strong><br>
+          • 若向内太阳系猛推使其坠向土星轨道（<code>9.54 AU</code>），太阳引力会将其加速至 <code>12.2~18.2 km/s</code>（土星公转速度 <code>9.67 km/s</code>），进入土星希尔球（半径 <code>0.436 AU = 6520万 km</code>）时双曲超速高达 <code>v_∞ ≥ 2.54~8.5 km/s</code>。<br>
+          • 在保守引力场中，进入希尔球前相对机械能 <code>E > 0</code>，若不刹车只会发生<strong>双曲引力弹弓偏转飞掠</strong>（见预设④）。<br>
+          • <strong>成为土星卫星的唯一办法（见预设⑤）：</strong> 在深入土星希尔球近星点（且高于土星洛希极限 <code>10.6万 km</code>）时，再次启动行星发动机<strong>逆向急刹车</strong>。
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script src="js/simulation.js"></script>
+</body>
+</html>

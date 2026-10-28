@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>冥王星拯救计划：太阳系 N-Body 引力动力学与土星捕获模拟实验室</title>
+  <style>
+    :root {
+      --bg-dark: #070b14;
+      --panel-bg: rgba(13, 20, 36, 0.92);
+      --panel-border: rgba(88, 166, 255, 0.22);
+      --accent-blue: #38bdf8;
+      --accent-gold: #fbbf24;
+      --accent-red: #f87171;
+      --accent-green: #34d399;
+      --accent-purple: #c084fc;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    header {
+      min-height: 54px;
+      background: rgba(10, 15, 28, 0.96);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      gap: 10px;
+      z-index: 20;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #38bdf8, #0284c7);
+      box-shadow: 0 0 12px #38bdf8;
+      flex-shrink: 0;
+    }
+    .brand h1 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      background: linear-gradient(90deg, #fff, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+    }
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: var(--accent-blue);
+      transition: all 0.25s ease;
+    }
+    .status-badge.escaped {
+      background: rgba(248, 113, 113, 0.18);
+      border-color: rgba(248, 113, 113, 0.5);
+      color: var(--accent-red);
+    }
+    .status-badge.captured {
+      background: rgba(192, 132, 252, 0.2);
+      border-color: rgba(192, 132, 252, 0.6);
+      color: var(--accent-purple);
+    }
+    .status-badge.bound {
+      background: rgba(52, 211, 153, 0.18);
+      border-color: rgba(52, 211, 153, 0.5);
+      color: var(--accent-green);
+    }
+    .main-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 340px minmax(360px, 1fr) 350px;
+      height: calc(100vh - 54px);
+      position: relative;
+    }
+    @media (max-width: 1180px) {
+      .main-container {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .canvas-wrapper {
+        height: 62vh !important;
+        min-height: 440px;
+        order: -1;
+      }
+      .sidebar {
+        border-right: none !important;
+        border-left: none !important;
+        border-bottom: 1px solid var(--panel-border);
+      }
+    }
+    .sidebar {
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border-right: 1px solid var(--panel-border);
+      padding: 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10;
+    }
+    .sidebar-right {
+      border-right: none;
+      border-left: 1px solid var(--panel-border);
+    }
+    .sidebar::-webkit-scrollbar {
+      width: 5px;
+    }
+    .sidebar::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 4px;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .card-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      letter-spacing: 0.4px;
+    }
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+    .btn {
+      background: rgba(30, 41, 59, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--text-main);
+      padding: 8px 10px;
+      border-radius: 7px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+      text-align: center;
+      user-select: none;
+    }
+    .btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+      transform: translateY(-1px);
+    }
+    .btn.active {
+      background: rgba(56, 189, 248, 0.28);
+      border-color: var(--accent-blue);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border-color: #38bdf8;
+      color: #fff;
+      font-weight: 600;
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #0369a1, #1d4ed8);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #dc2626, #991b1b);
+      border-color: #f87171;
+      color: #fff;
+      font-weight: 600;
+    }
+    .btn-gold {
+      background: linear-gradient(135deg, #d97706, #b45309);
+      border-color: #fbbf24;
+      color: #fff;
+      font-weight: 600;
+    }
+    .control-row {
+      margin-bottom: 10px;
+    }
+    .control-row:last-child {
+      margin-bottom: 0;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      gap: 6px;
+    }
+    .control-val {
+      color: var(--text-main);
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-weight: 600;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-blue);
+      height: 5px;
+      background: rgba(51, 65, 85, 0.9);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-main);
+      padding: 4px 0;
+      gap: 8px;
+    }
+    .canvas-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #0c1427 0%, #050811 100%);
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    .canvas-hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .hud-pill {
+      background: rgba(10, 16, 30, 0.82);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      backdrop-filter: blur(6px);
+      max-width: 100%;
+    }
+    .hud-pill strong {
+      color: #fff;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+    }
+    .canvas-toolbar {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13, 20, 36, 0.92);
+      border: 1px solid var(--panel-border);
+      padding: 7px 12px;
+      border-radius: 999px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      align-items: center;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      max-width: 95%;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric-box {
+      background: rgba(2, 6, 23, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 7px;
+      padding: 8px 10px;
+    }
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+    .metric-value {
+      font-size: 13px;
+      font-weight: 700;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      color: #f8fafc;
+    }
+    .metric-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .formula-note {
+      font-size: 11.5px;
+      line-height: 1.55;
+      color: #cbd5e1;
+    }
+    .formula-note code {
+      background: rgba(56, 189, 248, 0.12);
+      color: #7dd3fc;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+    }
+    .legend-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+    .alert-banner {
+      padding: 8px 10px;
+      border-radius: 7px;
+      font-size: 11.5px;
+      line-height: 1.45;
+      background: rgba(251, 191, 36, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      color: #fde68a;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <h1>冥王星拯救计划：太阳系 N-Body 引力动力学与土星捕获模拟实验室</h1>
+  </div>
+  <div class="header-badges">
+    <span id="orbitStateBadge" class="status-badge bound">当前状态：太阳系椭圆束缚轨道 (e = 0.244)</span>
+    <span style="color: var(--text-muted);">物理基准：<a href="https://nssdc.gsfc.nasa.gov/planetary/factsheet/plutofact.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue); text-decoration: none;">NASA 行星数据库</a></span>
+  </div>
+</header>
+
+<div class="main-container">
+  <!-- 左侧控制面板 -->
+  <aside class="sidebar">
+    <div class="card">
+      <div class="card-title">
+        <span>1. 一键实验场景预设</span>
+        <span style="font-size:10px; color:var(--text-muted);">点击切换</span>
+      </div>
+      <div class="preset-grid">
+        <button class="btn active" id="preset1" type="button">① 冥王星原始轨道</button>
+        <button class="btn" id="preset2" type="button">② 小行星撞击逃逸</button>
+        <button class="btn" id="preset3" type="button">③ 火箭拦截拉回太阳系</button>
+        <button class="btn" id="preset4" type="button">④ 过度反向推向土星飞掠</button>
+        <button class="btn" id="preset5" type="button" style="grid-column: span 2; border-color: rgba(192,132,252,0.6); color: #e9d5ff;">⑤ 推向土星 + 希尔球内逆向点火捕获成卫星</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>2. 小行星冲击与瞬时变轨脉冲</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>冲击/变轨速度增量 (Δv)</span>
+          <span class="control-val" id="dvMagVal">2.20 km/s</span>
+        </div>
+        <input type="range" id="dvMagSlider" min="0" max="15" step="0.05" value="2.20">
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>速度脉冲方向角 (相对当前速度矢量)</span>
+          <span class="control-val" id="dvAngleVal">0° (顺行加速)</span>
+        </div>
+        <input type="range" id="dvAngleSlider" min="-180" max="180" step="1" value="0">
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-danger" id="btnTriggerImpulse" type="button" style="flex:1;">💥 立即施加脉冲 Δv</button>
+        <button class="btn" id="btnCircularize" type="button" style="flex:1;">🛡️ 驻留圆化制动</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>3. 行星发动机 / 火箭推进参数</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>发动机类型与比冲 (Isp / 喷气速度 v_e)</span>
+          <span class="control-val" id="ispVal">v_e = 1000 km/s</span>
+        </div>
+        <select id="engineTypeSelect" style="width:100%; padding:6px 8px; border-radius:6px; background:#0f172a; color:#f8fafc; border:1px solid rgba(56,189,248,0.35); font-size:12px; margin-top:4px;">
+          <option value="3.73">SpaceX Raptor 3 真空化学火箭 (Isp=380s, v_e=3.73 km/s)</option>
+          <option value="4.44">氢氧化学火箭 RS-25 (Isp=453s, v_e=4.44 km/s)</option>
+          <option value="1.21">冥王星逃逸速度极限电推进 (v_e=1.21 km/s)</option>
+          <option value="100">重核裂变脉冲推进 (Isp=10,200s, v_e=100 km/s)</option>
+          <option value="1000" selected>行星级氘氦-3聚变发动机 (Isp=102,000s, v_e=1,000 km/s)</option>
+          <option value="15000">重子-反物质湮灭光子火箭 (v_e=15,000 km/s)</option>
+        </select>
+      </div>
+      <div class="control-row" style="margin-top:8px;">
+        <div class="control-label">
+          <span>持续推力模式 (开启或关闭行星发动机)</span>
+          <span class="control-val" id="contThrustVal">关闭</span>
+        </div>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <button class="btn" id="btnRetroBurn" type="button" style="flex:1;">🔥 持续逆向减速</button>
+          <button class="btn" id="btnSunBurn" type="button" style="flex:1;">🎯 持续向日推进</button>
+          <button class="btn" id="btnStopBurn" type="button">⏹ 关机</button>
+        </div>
+      </div>
+      <div class="control-row" style="margin-top:8px;">
+        <div class="control-label">
+          <span>模拟推进剂消耗占冥王星总质量比例</span>
+          <span class="control-val" id="propMassRatioVal">0.22%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>4. 土星引力与捕获辅助设置</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>土星质量倍率 (真实 = 1.0x = 5.68×10²⁶ kg)</span>
+          <span class="control-val" id="saturnMassVal">1.0x</span>
+        </div>
+        <input type="range" id="saturnMassSlider" min="0.5" max="20" step="0.5" value="1.0">
+      </div>
+      <div class="checkbox-row">
+        <label for="showHillCheck">显示土星希尔球 (Hill Sphere, 0.436 AU)</label>
+        <input type="checkbox" id="showHillCheck" checked>
+      </div>
+      <div class="checkbox-row">
+        <label for="autoCaptureCheck">进入土星希尔球时自动执行近星点逆向制动捕获</label>
+        <input type="checkbox" id="autoCaptureCheck">
+      </div>
+      <button class="btn btn-gold" id="btnManualCapture" type="button" style="width:100%; margin-top:6px;">🪐 立即锁定土星轨道（注入卫星捕获速度）</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>5. 时间流速与视图控制</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>时间步长倍率 (模拟速度)</span>
+          <span class="control-val" id="timeScaleVal">5.0 天/帧</span>
+        </div>
+        <input type="range" id="timeScaleSlider" min="0.2" max="25" step="0.2" value="5.0">
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>镜头跟随焦点</span>
+          <span class="control-val" id="cameraFocusVal">太阳系全景</span>
+        </div>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <button class="btn active" id="camSun" type="button" style="flex:1;">☀️ 太阳全景</button>
+          <button class="btn" id="camPluto" type="button" style="flex:1;">❄️ 追踪冥王星</button>
+          <button class="btn" id="camSaturn" type="button" style="flex:1;">🪐 追踪土星</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 中间 Canvas 互动区域 -->
+  <main class="canvas-wrapper">
+    <canvas id="simCanvas"></canvas>
+
+    <div class="canvas-hud">
+      <div class="hud-pill">
+        模拟历时：<strong id="simTimeYears">0.00</strong> 地球年 &nbsp;|&nbsp; 冥王星距太阳：<strong id="hudDistSun">39.48</strong> AU &nbsp;|&nbsp; 距土星：<strong id="hudDistSaturn">30.12</strong> AU
+      </div>
+      <div class="hud-pill">
+        太阳系机械能 E_sun：<strong id="hudEnergySun">-1.48e+29</strong> J &nbsp;|&nbsp; 土星相对机械能 E_sat：<strong id="hudEnergySat">+2.10e+29</strong> J
+      </div>
+      <div class="hud-pill">
+        滚轮缩放 · 按住拖拽平移 · 点击左上角预设①~⑤直观对比逃逸、火箭拉回与土星捕获
+      </div>
+    </div>
+
+    <div class="canvas-toolbar">
+      <button class="btn btn-primary" id="playPauseBtn" type="button">⏸ 暂停模拟</button>
+      <button class="btn" id="btnResetSim" type="button">🔄 重置当前场景</button>
+      <button class="btn" id="btnZoomIn" type="button">🔍 放大</button>
+      <button class="btn" id="btnZoomOut" type="button">🔎 缩小</button>
+      <button class="btn" id="btnClearTrails" type="button">🧹 清空轨迹</button>
+    </div>
+  </main>
+
+  <!-- 右侧天体物理实时遥测与深度计算面板 -->
+  <aside class="sidebar sidebar-right">
+    <div class="card">
+      <div class="card-title">
+        <span>实时轨道动力学遥测 (Telemetry)</span>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-box">
+          <div class="metric-label">冥王星日心速率 v</div>
+          <div class="metric-value" id="telVelSun">4.67 km/s</div>
+          <div class="metric-sub" id="telEscSun">太阳逃逸速度: 6.70 km/s</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">日心轨道偏心率 e</div>
+          <div class="metric-value" id="telEccSun">0.244</div>
+          <div class="metric-sub" id="telSmaSun">半长轴 a: 39.24 AU</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">冥王星相对土星速率 v_rel</div>
+          <div class="metric-value" id="telVelSat">11.20 km/s</div>
+          <div class="metric-sub" id="telEscSat">土星逃逸速度: 0.42 km/s</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">累计施加 Δv / 能量</div>
+          <div class="metric-value" id="telTotalDv">0.00 km/s</div>
+          <div class="metric-sub" id="telTotalEnergy">0.00 × 10²⁸ J</div>
+        </div>
+      </div>
+      <div class="legend-bar">
+        <div class="legend-item"><span class="dot" style="background:#fbbf24;"></span>太阳</div>
+        <div class="legend-item"><span class="dot" style="background:#f59e0b;"></span>木星 (5.2 AU)</div>
+        <div class="legend-item"><span class="dot" style="background:#eab308;"></span>土星 (9.54 AU)</div>
+        <div class="legend-item"><span class="dot" style="background:#38bdf8;"></span>天王星/海王星</div>
+        <div class="legend-item"><span class="dot" style="background:#f43f5e;"></span>冥王星实时轨迹</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>脉冲能量折算与火箭工程可行性</span>
+      </div>
+      <div class="metric-grid" style="margin-bottom:8px;">
+        <div class="metric-box">
+          <div class="metric-label">当前设定脉冲平移动能</div>
+          <div class="metric-value" id="calcKeVal">3.15 × 10²⁸ J</div>
+          <div class="metric-sub" id="calcTsarVal">≈ 1.30 亿颗沙皇氢弹</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">所需 SpaceX 猛禽3 数量</div>
+          <div class="metric-value" id="calcRaptorVal">3.37 × 10⁹ 台</div>
+          <div class="metric-sub">连续满推力燃烧 100 年</div>
+        </div>
+      </div>
+      <div class="alert-banner" id="engineeringAlert">
+        <strong>齐奥尔科夫斯基火箭方程警告：</strong> 若使用化学火箭（Isp=380s, 喷气速度 3.73 km/s）产生 2.20 km/s 的 Δv，需要消耗冥王星 <strong>46.4%</strong> 的自身质量作为燃料；若改为核聚变行星发动机（v_e=1000 km/s），仅需消耗 <strong>0.22%</strong> 冥王星质量！
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>核心天体力学问答解析</span>
+      </div>
+      <div class="formula-note" style="display:flex; flex-direction:column; gap:8px;">
+        <div>
+          <strong style="color:#f87171;">Q1: 冥王星需要多少能量才会逃离太阳系？</strong><br>
+          冥王星质量 <code>M_p = 1.303×10²² kg</code>，平均轨道半径 <code>39.24 AU</code>（平均公转速度 <code>4.64 km/s</code>，当地太阳逃逸速度 <code>6.715 km/s</code>）。顺行撞击只需补足 <code>Δv ≈ 1.97 km/s</code>（近日点仅需 <code>1.63 km/s</code>），净增机械能 <strong><code>1.47×10²⁹ J</code></strong>（相当于全球年总能耗的 2.37 亿倍）即可挣脱太阳引力束缚。
+        </div>
+        <div>
+          <strong style="color:#38bdf8;">Q2: 用火箭推进器反方向推进能带回吗？</strong><br>
+          若刚过逃逸临界点，只需逆向施加 <code>Δv ≈ 1.8~2.2 km/s</code> 即可重新被太阳捕获。但<strong>普通化学火箭不可行</strong>：一是冥王星表面逃逸速度为 <code>1.21 km/s</code>，喷气速度必须大于 <code>1.21 km/s</code> 尾气才不会落回表面；二是化学比冲太低，会烧掉近半颗冥王星。必须使用<strong>重核聚变行星发动机</strong>（<code>v_e ≥ 100~1,000 km/s</code>）。
+        </div>
+        <div>
+          <strong style="color:#c084fc;">Q3: 推回能量过大，会让冥王星变成土星的卫星吗？</strong><br>
+          <strong>单纯“推力过大”反而会让它更难被土星捕获！</strong><br>
+          • 若向内太阳系猛推使其坠向土星轨道（<code>9.54 AU</code>），太阳引力会将其加速至 <code>12.2~18.2 km/s</code>（土星公转速度 <code>9.67 km/s</code>），进入土星希尔球（半径 <code>0.436 AU = 6520万 km</code>）时双曲超速高达 <code>v_∞ ≥ 2.54~8.5 km/s</code>。<br>
+          • 在保守引力场中，进入希尔球前相对机械能 <code>E > 0</code>，若不刹车只会发生<strong>双曲引力弹弓偏转飞掠</strong>（见预设④）。<br>
+          • <strong>成为土星卫星的唯一办法（见预设⑤）：</strong> 在深入土星希尔球近星点（且高于土星洛希极限 <code>10.6万 km</code>）时，再次启动行星发动机<strong>逆向急刹车</strong>。
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+  // --- 物理常数与太阳系天体基准参数 (采用 AU, 地球日, 太阳质量 M_sun 为内部积分单位) ---
+  const AU_KM = 149597870.7;
+  const DAY_SEC = 86400;
+  const KMS_TO_AUDAY = DAY_SEC / AU_KM;
+  const AUDAY_TO_KMS = AU_KM / DAY_SEC;
+  const G_GAUSS = 0.0002959122082855911; // GM_sun in AU^3 / day^2
+
+  const PLUTO_MASS_KG = 1.303e22;
+  const SATURN_MASS_RATIO_BASE = 568.32 / 1988400;
+  const JUPITER_MASS_RATIO = 1898.19 / 1988400;
+  const URANUS_MASS_RATIO = 86.813 / 1988400;
+  const NEPTUNE_MASS_RATIO = 102.413 / 1988400;
+
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let width = 800, height = 600;
+  let isPlaying = true;
+  let simDays = 0;
+  let cameraScale = 8.2;
+  let cameraOffsetX = 0, cameraOffsetY = 0;
+  let cameraFocus = 'sun';
+  let currentPreset = 1;
+  let continuousThrustMode = 'off';
+  let totalDeltaVApplied = 0;
+  let saturnCapturedFlag = false;
+  let animFrameId = null;
+
+  const planets = [
+    { name: '木星', a: 5.204, v: 13.06 * KMS_TO_AUDAY, angle: 2.1, color: '#f59e0b', radius: 4.5, gm: G_GAUSS * JUPITER_MASS_RATIO },
+    { name: '土星', a: 9.537, v: 9.67 * KMS_TO_AUDAY, angle: 0.65, color: '#eab308', radius: 6.0, gm: G_GAUSS * SATURN_MASS_RATIO_BASE, isSaturn: true },
+    { name: '天王星', a: 19.191, v: 6.80 * KMS_TO_AUDAY, angle: 4.2, color: '#38bdf8', radius: 3.8, gm: G_GAUSS * URANUS_MASS_RATIO },
+    { name: '海王星', a: 30.07, v: 5.43 * KMS_TO_AUDAY, angle: 5.4, color: '#60a5fa', radius: 3.8, gm: G_GAUSS * NEPTUNE_MASS_RATIO }
+  ];
+
+  const pluto = {
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    trail: [],
+    maxTrail: 1600
+  };
+
+  const stars = Array.from({ length: 220 }, () => ({
+    x: Math.random(),
+    y: Math.random(),
+    r: Math.random() * 1.4 + 0.3,
+    alpha: Math.random() * 0.65 + 0.2
+  }));
+
+  function resizeCanvas() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    width = Math.max(300, rect.width);
+    height = Math.max(300, rect.height);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    renderCanvas();
+  }
+
+  function updatePlanetsFromAngles() {
+    planets.forEach(p => {
+      p.x = p.a * Math.cos(p.angle);
+      p.y = p.a * Math.sin(p.angle);
+      p.vx = -p.v * Math.sin(p.angle);
+      p.vy = p.v * Math.cos(p.angle);
+    });
+  }
+
+  function getSaturn() {
+    return planets[1];
+  }
+
+  function applyPreset(id) {
+    currentPreset = id;
+    document.querySelectorAll('.preset-grid .btn').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.getElementById('preset' + id);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    simDays = 0;
+    totalDeltaVApplied = 0;
+    saturnCapturedFlag = false;
+    continuousThrustMode = 'off';
+    updateThrustButtons();
+    pluto.trail = [];
+
+    planets[0].angle = 2.2;
+    planets[1].angle = 0.785398;
+    planets[2].angle = 3.9;
+    planets[3].angle = 5.3;
+    updatePlanetsFromAngles();
+
+    const r0 = 39.236;
+    const theta0 = 0.35;
+
+    if (id === 1) {
+      const rPeri = 29.658;
+      const vPeriKms = 6.10;
+      pluto.x = rPeri * Math.cos(theta0);
+      pluto.y = rPeri * Math.sin(theta0);
+      pluto.vx = -vPeriKms * KMS_TO_AUDAY * Math.sin(theta0);
+      pluto.vy = vPeriKms * KMS_TO_AUDAY * Math.cos(theta0);
+      document.getElementById('dvMagSlider').value = 2.20;
+      document.getElementById('dvAngleSlider').value = 0;
+      document.getElementById('autoCaptureCheck').checked = false;
+      cameraScale = 7.5;
+      setCameraFocus('sun');
+    } else if (id === 2) {
+      pluto.x = r0 * Math.cos(theta0);
+      pluto.y = r0 * Math.sin(theta0);
+      const vEscapeImpactKms = 4.64 + 2.80;
+      pluto.vx = -vEscapeImpactKms * KMS_TO_AUDAY * Math.sin(theta0);
+      pluto.vy = vEscapeImpactKms * KMS_TO_AUDAY * Math.cos(theta0);
+      totalDeltaVApplied = 2.80;
+      document.getElementById('dvMagSlider').value = 3.20;
+      document.getElementById('dvAngleSlider').value = 180;
+      document.getElementById('autoCaptureCheck').checked = false;
+      cameraScale = 6.5;
+      setCameraFocus('sun');
+    } else if (id === 3) {
+      const rStart = 42.0;
+      pluto.x = rStart * Math.cos(0.55);
+      pluto.y = rStart * Math.sin(0.55);
+      const vRescuedKms = 4.15;
+      pluto.vx = -vRescuedKms * KMS_TO_AUDAY * Math.sin(0.55) - 0.8 * KMS_TO_AUDAY * Math.cos(0.55);
+      pluto.vy = vRescuedKms * KMS_TO_AUDAY * Math.cos(0.55) - 0.8 * KMS_TO_AUDAY * Math.sin(0.55);
+      totalDeltaVApplied = 2.45;
+      document.getElementById('dvMagSlider').value = 2.45;
+      document.getElementById('dvAngleSlider').value = -165;
+      document.getElementById('autoCaptureCheck').checked = false;
+      cameraScale = 7.2;
+      setCameraFocus('sun');
+    } else if (id === 4) {
+      setupPlutoSaturnIntercept(false);
+    } else if (id === 5) {
+      setupPlutoSaturnIntercept(true);
+    }
+
+    updateControlLabels();
+    updateEngineCalculation();
+  }
+
+  function setupPlutoSaturnIntercept(enableAutoCapture) {
+    const sat = getSaturn();
+    sat.angle = 0.6;
+    updatePlanetsFromAngles();
+
+    const leadDays = 260;
+    const omegaSat = sat.v / sat.a;
+    const interceptAngle = sat.angle + omegaSat * leadDays;
+    const targetX = sat.a * Math.cos(interceptAngle);
+    const targetY = sat.a * Math.sin(interceptAngle);
+
+    const startDist = 16.5;
+    const startAngle = interceptAngle + 0.18;
+    pluto.x = startDist * Math.cos(startAngle);
+    pluto.y = startDist * Math.sin(startAngle);
+
+    const dx = targetX - pluto.x;
+    const dy = targetY - pluto.y;
+    const rMid = 0.5 * (startDist + sat.a);
+    const accSun = G_GAUSS / (rMid * rMid);
+    const ux = Math.cos(interceptAngle + 0.09);
+    const uy = Math.sin(interceptAngle + 0.09);
+
+    pluto.vx = (dx / leadDays) + 0.5 * accSun * leadDays * ux;
+    pluto.vy = (dy / leadDays) + 0.5 * accSun * leadDays * uy;
+
+    totalDeltaVApplied = 4.30;
+    document.getElementById('autoCaptureCheck').checked = enableAutoCapture;
+    document.getElementById('timeScaleSlider').value = 1.6;
+    cameraScale = 22.0;
+    setCameraFocus('saturn');
+  }
+
+  function updateControlLabels() {
+    const dv = parseFloat(document.getElementById('dvMagSlider').value);
+    const ang = parseInt(document.getElementById('dvAngleSlider').value, 10);
+    const ts = parseFloat(document.getElementById('timeScaleSlider').value);
+
+    document.getElementById('dvMagVal').textContent = dv.toFixed(2) + ' km/s';
+    let dirDesc = '';
+    if (ang === 0) dirDesc = ' (顺行加速)';
+    else if (Math.abs(ang) === 180) dirDesc = ' (逆行制动)';
+    else if (ang === -90) dirDesc = ' (径向向内)';
+    else if (ang === 90) dirDesc = ' (径向向外)';
+    document.getElementById('dvAngleVal').textContent = ang + '°' + dirDesc;
+    document.getElementById('timeScaleVal').textContent = ts.toFixed(1) + ' 天/帧';
+
+    updateEngineCalculation();
+  }
+
+  function updateSaturnParams() {
+    const mult = parseFloat(document.getElementById('saturnMassSlider').value);
+    document.getElementById('saturnMassVal').textContent = mult.toFixed(1) + 'x';
+    planets[1].gm = G_GAUSS * SATURN_MASS_RATIO_BASE * mult;
+  }
+
+  function updateEngineCalculation() {
+    const dvKms = parseFloat(document.getElementById('dvMagSlider').value);
+    const veKms = parseFloat(document.getElementById('engineTypeSelect').value);
+    const dvMs = dvKms * 1000;
+
+    const keJoules = 0.5 * PLUTO_MASS_KG * dvMs * dvMs;
+    const tsarCount = keJoules / 2.43e17;
+
+    const impulseRequired = PLUTO_MASS_KG * dvMs;
+    const singleRaptor100YrImpulse = 2.697e6 * (100 * 365.25 * 86400);
+    const raptorCount = impulseRequired / singleRaptor100YrImpulse;
+
+    document.getElementById('calcKeVal').textContent = formatSci(keJoules) + ' J';
+    document.getElementById('calcTsarVal').textContent = '≈ ' + formatSci(tsarCount) + ' 颗沙皇氢弹';
+    document.getElementById('calcRaptorVal').textContent = formatSci(raptorCount) + ' 台';
+
+    // 考虑冥王星表面逃逸速度 1.21 km/s 对有效喷气速度的修正
+    const veEff = veKms > 1.21 ? Math.sqrt(veKms * veKms - 1.21 * 1.21) : 0;
+    const massRatio = veEff > 0 ? (1 - Math.exp(-dvKms / veEff)) : 1;
+    const pct = (massRatio * 100).toFixed(2);
+    document.getElementById('propMassRatioVal').textContent = veEff > 0
+      ? (pct + '% (' + formatSci(PLUTO_MASS_KG * massRatio) + ' kg)')
+      : '无法逃逸 (净推力=0)';
+
+    const ispSec = Math.round((veKms * 1000) / 9.80665);
+    document.getElementById('ispVal').textContent = 'v_e = ' + veKms + ' km/s (Isp=' + ispSec.toLocaleString() + 's)';
+
+    const alertBox = document.getElementById('engineeringAlert');
+    if (veKms <= 1.21) {
+      alertBox.innerHTML = '⚠️ <strong>物理禁区警告：</strong> 当前喷气速度 (<code>' + veKms + ' km/s</code>) 低于或等于冥王星表面逃逸速度 (<code>1.21 km/s</code>)！喷出的工质会在冥王星引力下重新落回地表，净推力严格为零！';
+    } else if (massRatio > 0.25) {
+      alertBox.innerHTML = '⚠️ <strong>化学燃料灾难：</strong> 在 <code>v_e = ' + veKms + ' km/s</code>（有效排气速度 <code>' + veEff.toFixed(2) + ' km/s</code>）下产生 <code>' + dvKms.toFixed(2) + ' km/s</code> 的速度增量，需消耗冥王星 <strong>' + pct + '%</strong> 的自身质量作为推进剂！必须换用高比冲核聚变行星发动机。';
+    } else {
+      alertBox.innerHTML = '✅ <strong>行星发动机可行区间：</strong> 采用 <code>v_e = ' + veKms + ' km/s</code> 的高比冲推进系统，完成 <code>' + dvKms.toFixed(2) + ' km/s</code> 变轨仅需消耗冥王星 <strong>' + pct + '%</strong> 的冰层质量。';
+    }
+  }
+
+  function formatSci(num) {
+    if (num === 0) return '0.00';
+    const exp = Math.floor(Math.log10(Math.abs(num)));
+    const mant = num / Math.pow(10, exp);
+    return mant.toFixed(2) + '×10^' + exp;
+  }
+
+  function triggerImpulse() {
+    const dvKms = parseFloat(document.getElementById('dvMagSlider').value);
+    const angDeg = parseFloat(document.getElementById('dvAngleSlider').value);
+    const angRad = angDeg * Math.PI / 180;
+
+    const speed = Math.hypot(pluto.vx, pluto.vy);
+    let ux = 1, uy = 0;
+    if (speed > 1e-9) {
+      ux = pluto.vx / speed;
+      uy = pluto.vy / speed;
+    }
+    const dirX = ux * Math.cos(angRad) - uy * Math.sin(angRad);
+    const dirY = ux * Math.sin(angRad) + uy * Math.cos(angRad);
+
+    const dvAuDay = dvKms * KMS_TO_AUDAY;
+    pluto.vx += dirX * dvAuDay;
+    pluto.vy += dirY * dvAuDay;
+    totalDeltaVApplied += dvKms;
+  }
+
+  function brakeToCircular() {
+    const r = Math.hypot(pluto.x, pluto.y);
+    const vCirc = Math.sqrt(G_GAUSS / r);
+    const rx = pluto.x / r;
+    const ry = pluto.y / r;
+    const newVx = -vCirc * ry;
+    const newVy = vCirc * rx;
+    const dvAuDay = Math.hypot(newVx - pluto.vx, newVy - pluto.vy);
+    totalDeltaVApplied += dvAuDay * AUDAY_TO_KMS;
+    pluto.vx = newVx;
+    pluto.vy = newVy;
+  }
+
+  function manualSaturnCapture() {
+    const sat = getSaturn();
+    const orbitR = 0.14;
+    pluto.x = sat.x + orbitR;
+    pluto.y = sat.y;
+    const vOrbitSat = Math.sqrt(sat.gm / orbitR);
+    pluto.vx = sat.vx;
+    pluto.vy = sat.vy + vOrbitSat;
+    totalDeltaVApplied += 6.85;
+    saturnCapturedFlag = true;
+    cameraScale = 42.0;
+    setCameraFocus('saturn');
+  }
+
+  function toggleContinuousThrust(mode) {
+    continuousThrustMode = mode;
+    updateThrustButtons();
+  }
+
+  function updateThrustButtons() {
+    document.getElementById('btnRetroBurn').classList.toggle('active', continuousThrustMode === 'retro');
+    document.getElementById('btnSunBurn').classList.toggle('active', continuousThrustMode === 'sunward');
+    const label = document.getElementById('contThrustVal');
+    if (continuousThrustMode === 'retro') label.textContent = '逆向减速中';
+    else if (continuousThrustMode === 'sunward') label.textContent = '向日推进中';
+    else label.textContent = '关闭';
+  }
+
+  function setCameraFocus(target) {
+    cameraFocus = target;
+    document.getElementById('camSun').classList.toggle('active', target === 'sun');
+    document.getElementById('camPluto').classList.toggle('active', target === 'pluto');
+    document.getElementById('camSaturn').classList.toggle('active', target === 'saturn');
+    const mapNames = { sun: '太阳系全景', pluto: '追踪冥王星', saturn: '追踪土星' };
+    document.getElementById('cameraFocusVal').textContent = mapNames[target];
+    cameraOffsetX = 0;
+    cameraOffsetY = 0;
+  }
+
+  function togglePlay() {
+    isPlaying = !isPlaying;
+    document.getElementById('playPauseBtn').textContent = isPlaying ? '⏸ 暂停模拟' : '▶️ 继续模拟';
+  }
+
+  function resetSimulation() {
+    applyPreset(currentPreset);
+  }
+
+  function clearTrails() {
+    pluto.trail = [];
+  }
+
+  function zoomCanvas(factor) {
+    cameraScale = Math.max(1.2, Math.min(220, cameraScale * factor));
+  }
+
+  let isDragging = false, lastMouseX = 0, lastMouseY = 0;
+  canvas.addEventListener('pointerdown', e => {
+    isDragging = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!isDragging) return;
+    cameraOffsetX += e.clientX - lastMouseX;
+    cameraOffsetY += e.clientY - lastMouseY;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+  canvas.addEventListener('pointerup', () => { isDragging = false; });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    zoomCanvas(factor);
+  }, { passive: false });
+
+  function computePlutoAcceleration(x, y) {
+    const rSunSq = x * x + y * y + 1e-8;
+    const rSun = Math.sqrt(rSunSq);
+    let ax = -G_GAUSS * x / (rSunSq * rSun);
+    let ay = -G_GAUSS * y / (rSunSq * rSun);
+
+    for (let i = 0; i < planets.length; i++) {
+      const p = planets[i];
+      const dx = x - p.x;
+      const dy = y - p.y;
+      const dSq = dx * dx + dy * dy + 1e-6;
+      const d = Math.sqrt(dSq);
+      ax -= p.gm * dx / (dSq * d);
+      ay -= p.gm * dy / (dSq * d);
+    }
+
+    if (continuousThrustMode === 'retro') {
+      const v = Math.hypot(pluto.vx, pluto.vy);
+      if (v > 1e-8) {
+        const thrustAcc = 0.015 * KMS_TO_AUDAY;
+        ax -= (pluto.vx / v) * thrustAcc;
+        ay -= (pluto.vy / v) * thrustAcc;
+      }
+    } else if (continuousThrustMode === 'sunward') {
+      const thrustAcc = 0.015 * KMS_TO_AUDAY;
+      ax -= (x / rSun) * thrustAcc;
+      ay -= (y / rSun) * thrustAcc;
+    }
+
+    return { ax, ay };
+  }
+
+  function stepPhysics() {
+    const totalDt = parseFloat(document.getElementById('timeScaleSlider').value);
+    const sat = getSaturn();
+    const distSatNow = Math.hypot(pluto.x - sat.x, pluto.y - sat.y);
+
+    const subSteps = distSatNow < 1.2 ? 24 : 8;
+    const dt = totalDt / subSteps;
+
+    for (let s = 0; s < subSteps; s++) {
+      for (let i = 0; i < planets.length; i++) {
+        const p = planets[i];
+        const omega = p.v / p.a;
+        p.angle += omega * dt;
+        p.x = p.a * Math.cos(p.angle);
+        p.y = p.a * Math.sin(p.angle);
+        p.vx = -p.v * Math.sin(p.angle);
+        p.vy = p.v * Math.cos(p.angle);
+      }
+
+      const acc0 = computePlutoAcceleration(pluto.x, pluto.y);
+      const nextX = pluto.x + pluto.vx * dt + 0.5 * acc0.ax * dt * dt;
+      const nextY = pluto.y + pluto.vy * dt + 0.5 * acc0.ay * dt * dt;
+      const acc1 = computePlutoAcceleration(nextX, nextY);
+
+      pluto.x = nextX;
+      pluto.y = nextY;
+      pluto.vx += 0.5 * (acc0.ax + acc1.ax) * dt;
+      pluto.vy += 0.5 * (acc0.ay + acc1.ay) * dt;
+
+      if (continuousThrustMode !== 'off') {
+        totalDeltaVApplied += 0.015 * dt;
+      }
+
+      const autoCap = document.getElementById('autoCaptureCheck').checked;
+      const dxSat = pluto.x - sat.x;
+      const dySat = pluto.y - sat.y;
+      const dSat = Math.hypot(dxSat, dySat);
+
+      if (autoCap && !saturnCapturedFlag && dSat < 0.18) {
+        const vCircSat = Math.sqrt(sat.gm / dSat);
+        const tx = -dySat / dSat;
+        const ty = dxSat / dSat;
+        const targetVx = sat.vx + tx * vCircSat * 0.96;
+        const targetVy = sat.vy + ty * vCircSat * 0.96;
+        const dvBrakeKms = Math.hypot(targetVx - pluto.vx, targetVy - pluto.vy) * AUDAY_TO_KMS;
+        totalDeltaVApplied += dvBrakeKms;
+        pluto.vx = targetVx;
+        pluto.vy = targetVy;
+        saturnCapturedFlag = true;
+      }
+    }
+
+    simDays += totalDt;
+    pluto.trail.push({ x: pluto.x, y: pluto.y });
+    if (pluto.trail.length > pluto.maxTrail) {
+      pluto.trail.shift();
+    }
+  }
+
+  function updateTelemetryUI() {
+    const rSun = Math.hypot(pluto.x, pluto.y);
+    const vSunAuday = Math.hypot(pluto.vx, pluto.vy);
+    const vSunKms = vSunAuday * AUDAY_TO_KMS;
+    const vEscSunKms = Math.sqrt(2 * G_GAUSS / rSun) * AUDAY_TO_KMS;
+
+    const specEnergySun = 0.5 * vSunAuday * vSunAuday - G_GAUSS / rSun;
+    const hSun = pluto.x * pluto.vy - pluto.y * pluto.vx;
+    const eccSun = Math.sqrt(Math.max(0, 1 + (2 * specEnergySun * hSun * hSun) / (G_GAUSS * G_GAUSS)));
+    const smaSun = -G_GAUSS / (2 * specEnergySun);
+
+    const specEnergySunJPerKg = (0.5 * Math.pow(vSunKms * 1000, 2)) - (1.32712e20 / (rSun * AU_KM * 1000));
+    const totalEnergySunJ = PLUTO_MASS_KG * specEnergySunJPerKg;
+
+    const sat = getSaturn();
+    const dxSat = pluto.x - sat.x;
+    const dySat = pluto.y - sat.y;
+    const rSat = Math.hypot(dxSat, dySat);
+    const dvxSat = pluto.vx - sat.vx;
+    const dvySat = pluto.vy - sat.vy;
+    const vRelSatAuday = Math.hypot(dvxSat, dvySat);
+    const vRelSatKms = vRelSatAuday * AUDAY_TO_KMS;
+    const vEscSatKms = Math.sqrt(2 * sat.gm / rSat) * AUDAY_TO_KMS;
+
+    const specEnergySat = 0.5 * vRelSatAuday * vRelSatAuday - sat.gm / rSat;
+    const satMassMult = parseFloat(document.getElementById('saturnMassSlider').value);
+    const specEnergySatJPerKg = (0.5 * Math.pow(vRelSatKms * 1000, 2)) - (3.7931e16 * satMassMult / (rSat * AU_KM * 1000));
+    const totalEnergySatJ = PLUTO_MASS_KG * specEnergySatJPerKg;
+
+    const hillRadiusAu = sat.a * Math.pow((SATURN_MASS_RATIO_BASE * satMassMult) / 3, 1 / 3);
+
+    document.getElementById('simTimeYears').textContent = (simDays / 365.25).toFixed(2);
+    document.getElementById('hudDistSun').textContent = rSun.toFixed(2);
+    document.getElementById('hudDistSaturn').textContent = rSat.toFixed(3);
+    document.getElementById('hudEnergySun').textContent = (totalEnergySunJ >= 0 ? '+' : '') + totalEnergySunJ.toExponential(2);
+    document.getElementById('hudEnergySat').textContent = (totalEnergySatJ >= 0 ? '+' : '') + totalEnergySatJ.toExponential(2);
+
+    document.getElementById('telVelSun').textContent = vSunKms.toFixed(2) + ' km/s';
+    document.getElementById('telEscSun').textContent = '太阳逃逸速度: ' + vEscSunKms.toFixed(2) + ' km/s';
+    document.getElementById('telEccSun').textContent = eccSun.toFixed(3);
+    document.getElementById('telSmaSun').textContent = smaSun > 0 ? ('半长轴 a: ' + smaSun.toFixed(2) + ' AU') : ('双曲半实轴: ' + Math.abs(smaSun).toFixed(2) + ' AU');
+
+    document.getElementById('telVelSat').textContent = vRelSatKms.toFixed(2) + ' km/s';
+    document.getElementById('telEscSat').textContent = '土星局部逃逸: ' + vEscSatKms.toFixed(2) + ' km/s';
+    document.getElementById('telTotalDv').textContent = totalDeltaVApplied.toFixed(2) + ' km/s';
+    const totalKeUsed = 0.5 * PLUTO_MASS_KG * Math.pow(totalDeltaVApplied * 1000, 2);
+    document.getElementById('telTotalEnergy').textContent = formatSci(totalKeUsed) + ' J';
+
+    const badge = document.getElementById('orbitStateBadge');
+    if (rSat < hillRadiusAu && specEnergySat < 0) {
+      badge.className = 'status-badge captured';
+      badge.textContent = '🪐 当前状态：已被土星引力捕获（成为土星卫星，r = ' + (rSat * 149.6).toFixed(1) + '百万 km）';
+    } else if (specEnergySun >= 0) {
+      badge.className = 'status-badge escaped';
+      const vInf = Math.sqrt(2 * specEnergySun) * AUDAY_TO_KMS;
+      badge.textContent = '🚀 当前状态：太阳系双曲逃逸轨道 (e = ' + eccSun.toFixed(2) + ', v_∞ = ' + vInf.toFixed(2) + ' km/s)';
+    } else {
+      badge.className = 'status-badge bound';
+      badge.textContent = '☀️ 当前状态：太阳系椭圆束缚轨道 (e = ' + eccSun.toFixed(3) + ', a = ' + smaSun.toFixed(1) + ' AU)';
+    }
+  }
+
+  function renderCanvas() {
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      ctx.globalAlpha = s.alpha;
+      ctx.beginPath();
+      ctx.arc(s.x * width, s.y * height, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
+    let focusX = 0, focusY = 0;
+    if (cameraFocus === 'pluto') {
+      focusX = pluto.x;
+      focusY = pluto.y;
+    } else if (cameraFocus === 'saturn') {
+      focusX = getSaturn().x;
+      focusY = getSaturn().y;
+    }
+
+    const cx = width / 2 + cameraOffsetX - focusX * cameraScale;
+    const cy = height / 2 + cameraOffsetY - focusY * cameraScale;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+    ctx.setLineDash([4, 6]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let deg = 0; deg <= 360; deg += 3) {
+      const rad = deg * Math.PI / 180;
+      const rRef = (39.236 * (1 - 0.2444 * 0.2444)) / (1 + 0.2444 * Math.cos(rad - 0.35));
+      const px = cx + rRef * Math.cos(rad) * cameraScale;
+      const py = cy + rRef * Math.sin(rad) * cameraScale;
+      if (deg === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    planets.forEach(p => {
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, p.a * cameraScale, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const px = cx + p.x * cameraScale;
+      const py = cy + p.y * cameraScale;
+
+      if (p.isSaturn && document.getElementById('showHillCheck').checked) {
+        const satMassMult = parseFloat(document.getElementById('saturnMassSlider').value);
+        const hillAu = p.a * Math.pow((SATURN_MASS_RATIO_BASE * satMassMult) / 3, 1 / 3);
+        const hillPx = Math.max(4, hillAu * cameraScale);
+        ctx.save();
+        ctx.fillStyle = 'rgba(192, 132, 252, 0.10)';
+        ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(px, py, hillPx, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (p.isSaturn) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(253, 224, 71, 0.65)';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.ellipse(px, py, p.radius * 2.1, p.radius * 0.85, 0.4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(px, py, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.8)';
+      ctx.font = '11px -apple-system, sans-serif';
+      ctx.fillText(p.name, px + p.radius + 4, py + 3);
+    });
+
+    const sunGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 18);
+    sunGrad.addColorStop(0, '#ffffff');
+    sunGrad.addColorStop(0.35, '#fde047');
+    sunGrad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = sunGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (pluto.trail.length > 1) {
+      ctx.save();
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = '#f43f5e';
+      ctx.beginPath();
+      for (let i = 0; i < pluto.trail.length; i++) {
+        const pt = pluto.trail[i];
+        const tx = cx + pt.x * cameraScale;
+        const ty = cy + pt.y * cameraScale;
+        if (i === 0) ctx.moveTo(tx, ty);
+        else ctx.lineTo(tx, ty);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const plutoPx = cx + pluto.x * cameraScale;
+    const plutoPy = cy + pluto.y * cameraScale;
+
+    const vLen = Math.hypot(pluto.vx, pluto.vy);
+    if (vLen > 1e-8) {
+      const ux = pluto.vx / vLen;
+      const uy = pluto.vy / vLen;
+      const arrowLen = Math.min(65, Math.max(24, vLen * AUDAY_TO_KMS * 4.5));
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(plutoPx, plutoPy);
+      ctx.lineTo(plutoPx + ux * arrowLen, plutoPy + uy * arrowLen);
+      ctx.stroke();
+
+      const dvKms = parseFloat(document.getElementById('dvMagSlider').value);
+      const angRad = parseFloat(document.getElementById('dvAngleSlider').value) * Math.PI / 180;
+      if (dvKms > 0.05) {
+        const dirX = ux * Math.cos(angRad) - uy * Math.sin(angRad);
+        const dirY = ux * Math.sin(angRad) + uy * Math.cos(angRad);
+        const dvLen = Math.min(55, dvKms * 5.0);
+        ctx.save();
+        ctx.strokeStyle = '#fbbf24';
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(plutoPx, plutoPy);
+        ctx.lineTo(plutoPx + dirX * dvLen, plutoPy + dirY * dvLen);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    ctx.fillStyle = '#f43f5e';
+    ctx.shadowColor = '#f43f5e';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(plutoPx, plutoPy, 5.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 12px -apple-system, sans-serif';
+    ctx.fillText('冥王星 (Pluto)', plutoPx + 8, plutoPy - 6);
+  }
+
+  function animate() {
+    if (isPlaying) {
+      stepPhysics();
+    }
+    updateTelemetryUI();
+    renderCanvas();
+    animFrameId = requestAnimationFrame(animate);
+  }
+
+  function bindEvents() {
+    document.getElementById('preset1').addEventListener('click', () => applyPreset(1));
+    document.getElementById('preset2').addEventListener('click', () => applyPreset(2));
+    document.getElementById('preset3').addEventListener('click', () => applyPreset(3));
+    document.getElementById('preset4').addEventListener('click', () => applyPreset(4));
+    document.getElementById('preset5').addEventListener('click', () => applyPreset(5));
+
+    document.getElementById('dvMagSlider').addEventListener('input', updateControlLabels);
+    document.getElementById('dvAngleSlider').addEventListener('input', updateControlLabels);
+    document.getElementById('btnTriggerImpulse').addEventListener('click', triggerImpulse);
+    document.getElementById('btnCircularize').addEventListener('click', brakeToCircular);
+
+    document.getElementById('engineTypeSelect').addEventListener('change', updateEngineCalculation);
+    document.getElementById('btnRetroBurn').addEventListener('click', () => toggleContinuousThrust('retro'));
+    document.getElementById('btnSunBurn').addEventListener('click', () => toggleContinuousThrust('sunward'));
+    document.getElementById('btnStopBurn').addEventListener('click', () => toggleContinuousThrust('off'));
+
+    document.getElementById('saturnMassSlider').addEventListener('input', updateSaturnParams);
+    document.getElementById('showHillCheck').addEventListener('change', renderCanvas);
+    document.getElementById('btnManualCapture').addEventListener('click', manualSaturnCapture);
+
+    document.getElementById('timeScaleSlider').addEventListener('input', updateControlLabels);
+    document.getElementById('camSun').addEventListener('click', () => setCameraFocus('sun'));
+    document.getElementById('camPluto').addEventListener('click', () => setCameraFocus('pluto'));
+    document.getElementById('camSaturn').addEventListener('click', () => setCameraFocus('saturn'));
+
+    document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
+    document.getElementById('btnResetSim').addEventListener('click', resetSimulation);
+    document.getElementById('btnZoomIn').addEventListener('click', () => zoomCanvas(1.25));
+    document.getElementById('btnZoomOut').addEventListener('click', () => zoomCanvas(0.8));
+    document.getElementById('btnClearTrails').addEventListener('click', clearTrails);
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('load', () => {
+    bindEvents();
+    resizeCanvas();
+    applyPreset(1);
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+    animFrameId = requestAnimationFrame(animate);
+  });
+</script>
+</body>
+</html>
