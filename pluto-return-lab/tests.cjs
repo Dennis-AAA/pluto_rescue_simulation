@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');require('./physics.js');const P=global.Physics,C=P.C;
+let count=0;function close(a,b,tol,label){assert.ok(Math.abs(a-b)<=tol,`${label}: ${a} vs ${b}`);count++;}
+let p={scene:'solar',r:39.48,vinf:1,flight:0,dv:0,angle:180,years:248,planets:false,phase:0,rp:20,svinf:5,days:30,isp:450,burn:100,thrust:2,heat:.01,impactV:20,density:3000,beta:1,coupling:10};
+let s=P.scenario(p);close(s.vc/1000,4.740286,1e-6,'circular speed');close(s.ve/1000,6.703777,1e-6,'escape speed');close((s.v-s.ve),74.174469,.00001,'capture threshold');close(s.o0.eps,500000,1e-7,'hyperbolic energy');
+let cap=P.scenario({...p,dv:.074});assert.ok(cap.o1.eps>0);count++;cap=P.scenario({...p,dv:.075});assert.ok(cap.o1.eps<0);count++;
+let rescued=P.scenario({...p,dv:.1});close(rescued.o1.Q/C.AU,5094.53,.1,'weak capture aphelion');
+for(let flight of [-80,-30,0,35,85]){let par={...p,flight},target=P.target(par,'circle');let orbit=P.scenario({...par,...target});close(orbit.o1.v,orbit.vc,1e-8,'vector circularization');assert.ok(orbit.o1.e<1e-6);count++;}
+let target=P.target(p,'circle');s=P.scenario({...p,...target});close(s.dv,2037.665192,.00001,'circle delta v');let r=P.rocket(s.dv,p);close(r.fuel/C.M,.586836,.00001,'fuel fraction');close(r.N,5.3442e9,1e6,'engine count');close(r.N*p.thrust*1e6*p.burn*C.YEAR,r.fuel*r.ve,1e12,'impulse budget');
+let t=P.target(p,'transfer'),transfer=P.scenario({...p,...t});close(transfer.o1.q/C.AU,9.58,1e-10,'transfer perihelion');close(transfer.o1.period/C.YEAR/2,60.747,.001,'transfer half period');
+let trajectory=P.integrate(s,p,s.after),end=trajectory.points.at(-1);assert.ok(trajectory.maxDrift<1e-8);count++;let period=s.o1.period/C.YEAR,angle=2*Math.PI*p.years/period;close(end.s[0],p.r*Math.cos(angle),.000001,'numerical Kepler x');close(end.s[1],p.r*Math.sin(angle),.000001,'numerical Kepler y');
+let satp={...p,scene:'saturn'},sat=P.scenario(satp);close(sat.v/1000,9.377503,1e-6,'saturn arrival');close(P.target(satp,'circle').dv,3.767799,1e-6,'saturn circle delta v');close(C.hill/C.AU,.43754,.00001,'Hill radius');let satc=P.scenario({...satp,...P.target(satp,'circle')});let satpath=P.integrate(satc,satp,satc.after);assert.ok(satpath.maxDrift<1e-8);count++;
+let impact=P.impact(p);close(impact.diameter/1000,933.9,1,'impactor diameter');close(impact.ratio,44.7,.2,'impact to binding');
+for(const vals of [{r:5000,years:3000,vinf:15,flight:85,dv:25},{r:10,years:3000,vinf:0,dv:0},{r:39.48,years:100,planets:true,phase:200},{scene:'saturn',rp:3,svinf:20,dv:30,days:60}]){let q={...p,...vals},s=P.scenario(q),tr=P.integrate(s,q,s.after);assert.ok(tr.points.length>1&&tr.points.every(pt=>pt.s.every(Number.isFinite)));count++;}
+console.log(JSON.stringify({passed:count,circularDeltaV:s.dv,removedEnergy:s.remove,fuel:r.fuel,engines:r.N,jet:r.jet,bindingEnergy:C.U,impact,transferYears:transfer.o1.period/C.YEAR/2,energyDrift:trajectory.maxDrift},null,2));
